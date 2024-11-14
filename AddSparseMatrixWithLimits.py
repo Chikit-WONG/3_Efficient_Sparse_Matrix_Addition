@@ -1,7 +1,7 @@
 import time
 import resource
 import sys
-from AddSparseMatrix import read_sparse_matrix, write_sparse_matrix, to_csr, add_csr_matrices
+from AddSparseMatrix import read_sparse_matrix, write_sparse_matrix, to_csr, add_csr_matrices_optimized
 
 # 设置最大内存限制（128MB）
 MAX_MEMORY_MB = 128
@@ -53,49 +53,30 @@ def main(input_file1="input1.txt", input_file2="input2.txt", output_file="output
     values1, col_indices1, row_ptr1 = to_csr(matrix1)
     values2, col_indices2, row_ptr2 = to_csr(matrix2)
 
-    result_values, result_col_indices, result_row_ptr = add_csr_matrices(
+    result_values, result_col_indices, result_row_ptr = add_csr_matrices_optimized(
         values1, col_indices1, row_ptr1, values2, col_indices2, row_ptr2
     )
 
-    # 将结果转换回字典格式，方便写入文件
-    result_matrix = {}
-    for row in range(len(result_row_ptr) - 1):
-        result_matrix[row + 1] = {}
-        for idx in range(result_row_ptr[row], result_row_ptr[row + 1]):
-            col = result_col_indices[idx]
-            value = result_values[idx]
-            result_matrix[row + 1][col] = value
+    # 延迟写入结果矩阵
+    with open(output_file, 'w') as file:
+        file.write(f"{rows1}, {cols1}\n")
+        result_lines = []
+        for row in range(len(result_row_ptr) - 1):
+            row_entries = []
+            for idx in range(result_row_ptr[row], result_row_ptr[row + 1]):
+                col = result_col_indices[idx]
+                value = result_values[idx]
+                row_entries.append(f"{col}:{value}")
+            
+            # 如果该行没有非零元素，添加 "row :"
+            if row_entries:
+                result_lines.append(f"{row + 1} {' '.join(row_entries)}\n")
+            else:
+                result_lines.append(f"{row + 1} :\n")
+        
+        file.writelines(result_lines)
 
-    write_sparse_matrix(output_file, rows1, cols1, result_matrix)
-    
-    
-    # 保留原来的 main 函数及装饰器
-@time_memory_checker
-def main(input_file1="input1.txt", input_file2="input2.txt", output_file="output2.txt"):
-    rows1, cols1, matrix1 = read_sparse_matrix(input_file1)
-    rows2, cols2, matrix2 = read_sparse_matrix(input_file2)
-
-    if rows1 != rows2 or cols1 != cols2:
-        raise ValueError("Matrices dimensions do not match.")
-
-    values1, col_indices1, row_ptr1 = to_csr(matrix1)
-    values2, col_indices2, row_ptr2 = to_csr(matrix2)
-
-    result_values, result_col_indices, result_row_ptr = add_csr_matrices(
-        values1, col_indices1, row_ptr1, values2, col_indices2, row_ptr2
-    )
-
-    result_matrix = {}
-    for row in range(len(result_row_ptr) - 1):
-        result_matrix[row + 1] = {}
-        for idx in range(result_row_ptr[row], result_row_ptr[row + 1]):
-            col = result_col_indices[idx]
-            value = result_values[idx]
-            result_matrix[row + 1][col] = value
-
-    write_sparse_matrix(output_file, rows1, cols1, result_matrix)
-
-# 新增没有限制的主函数
+# 无限制的主函数用于测试和优化
 def main_without_limits(input_file1="input1.txt", input_file2="input2.txt", output_file="output2.txt"):
     rows1, cols1, matrix1 = read_sparse_matrix(input_file1)
     rows2, cols2, matrix2 = read_sparse_matrix(input_file2)
@@ -106,48 +87,26 @@ def main_without_limits(input_file1="input1.txt", input_file2="input2.txt", outp
     values1, col_indices1, row_ptr1 = to_csr(matrix1)
     values2, col_indices2, row_ptr2 = to_csr(matrix2)
 
-    result_values, result_col_indices, result_row_ptr = add_csr_matrices(
+    result_values, result_col_indices, result_row_ptr = add_csr_matrices_optimized(
         values1, col_indices1, row_ptr1, values2, col_indices2, row_ptr2
     )
 
-    result_matrix = {}
-    for row in range(len(result_row_ptr) - 1):
-        result_matrix[row + 1] = {}
-        for idx in range(result_row_ptr[row], result_row_ptr[row + 1]):
-            col = result_col_indices[idx]
-            value = result_values[idx]
-            result_matrix[row + 1][col] = value
-
-    write_sparse_matrix(output_file, rows1, cols1, result_matrix)
-    
-    
-# 仅包含矩阵相加逻辑，不带时间和内存统计
-def main_without_output(input_file1="input1.txt", input_file2="input2.txt", output_file="output2.txt"):
-    rows1, cols1, matrix1 = read_sparse_matrix(input_file1)
-    rows2, cols2, matrix2 = read_sparse_matrix(input_file2)
-
-    if rows1 != rows2 or cols1 != cols2:
-        raise ValueError("Matrices dimensions do not match.")
-
-    values1, col_indices1, row_ptr1 = to_csr(matrix1)
-    values2, col_indices2, row_ptr2 = to_csr(matrix2)
-
-    result_values, result_col_indices, result_row_ptr = add_csr_matrices(
-        values1, col_indices1, row_ptr1, values2, col_indices2, row_ptr2
-    )
-
-    result_matrix = {}
-    for row in range(len(result_row_ptr) - 1):
-        result_matrix[row + 1] = {}
-        for idx in range(result_row_ptr[row], result_row_ptr[row + 1]):
-            col = result_col_indices[idx]
-            value = result_values[idx]
-            result_matrix[row + 1][col] = value
-
-    write_sparse_matrix(output_file, rows1, cols1, result_matrix)
-
-
-    
+    # 延迟写入：先构建字符串，再一次性写入
+    with open(output_file, 'w') as file:
+        file.write(f"{rows1}, {cols1}\n")
+        result_lines = []
+        for row in range(len(result_row_ptr) - 1):
+            row_entries = []
+            for idx in range(result_row_ptr[row], result_row_ptr[row + 1]):
+                col = result_col_indices[idx]
+                value = result_values[idx]
+                row_entries.append(f"{col}:{value}")
+            # 如果该行没有非零元素，添加 "row :"
+            if row_entries:
+                result_lines.append(f"{row + 1} {' '.join(row_entries)}\n")
+            else:
+                result_lines.append(f"{row + 1} :\n")
+        file.writelines(result_lines)
 
 if __name__ == "__main__":
     main()

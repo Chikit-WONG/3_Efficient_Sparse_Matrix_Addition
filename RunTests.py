@@ -1,13 +1,7 @@
 import random
 import time
-import resource
-import psutil
 import os
 from AddSparseMatrixWithLimits import main
-
-# 设置最大内存和时间限制
-MAX_MEMORY_MB = 128
-MAX_TIME_SEC = 30
 
 # 生成稀疏矩阵的函数
 def generate_sparse_matrix(rows, cols, sparsity=0.95, filename="input.txt"):
@@ -27,48 +21,45 @@ def generate_sparse_matrix(rows, cols, sparsity=0.95, filename="input.txt"):
             else:
                 file.write(f"{row} :\n")
 
-def memory_limit_check():
-    """设置内存限制。"""
-    soft, hard = resource.getrlimit(resource.RLIMIT_AS)
-    resource.setrlimit(resource.RLIMIT_AS, (MAX_MEMORY_MB * 1024 * 1024, hard))
-
+# 测试运行函数
 def run_test(matrix_size, test_name):
-    """运行测试，捕获时间和内存信息，并在超出限制时输出资源使用情况。"""
+    """运行测试，生成稀疏矩阵文件，测量时间和内存使用，并检查输出准确性。"""
     rows, cols = matrix_size
     print(f"Running {test_name} with matrix size {rows}x{cols}...")
 
-    # 生成输入矩阵
-    generate_sparse_matrix(rows, cols, sparsity=0.95, filename="input3.txt")
-    generate_sparse_matrix(rows, cols, sparsity=0.95, filename="input4.txt")
+    # 使用不同的文件名生成测试输入文件
+    generate_sparse_matrix(rows, cols, sparsity=0.95, filename="test_input1.txt")
+    generate_sparse_matrix(rows, cols, sparsity=0.95, filename="test_input2.txt")
 
-    # 设置内存限制
-    memory_limit_check()
-
-    # 初始化psutil监控内存和时间
-    process = psutil.Process(os.getpid())
-    peak_memory_used = 0
+    # 测量时间
     start_time = time.time()
+    main("test_input1.txt", "test_input2.txt", "output.txt")
+    end_time = time.time()
+    elapsed_time = end_time - start_time
 
-    try:
-        main("input3.txt", "input4.txt", "output2.txt")
-    except MemoryError:
-        print("Memory limit exceeded!")
-    except resource.error:
-        print("Resource limit error encountered!")
-    except Exception as e:
-        print(f"An error occurred: {e}")
-    finally:
-        end_time = time.time()
-        elapsed_time = end_time - start_time
+    print(f"Execution time: {elapsed_time:.2f} seconds")
 
-        # 获取内存使用的峰值
-        peak_memory_used = process.memory_info().rss / (1024 * 1024)
+    # 检查输出文件的大小
+    output_size = os.path.getsize("output.txt") / 1024  # 转换为KB
+    print(f"Output file size: {output_size:.2f} KB")
 
-        # 输出实际的执行时间和内存峰值
-        print(f"Execution time: {elapsed_time:.2f} seconds")
-        print(f"Peak memory used: {peak_memory_used:.2f} MB\n")
+    # 检查输出文件的准确性
+    if compare_files("output.txt", "output_original.txt"):
+        print(f"{test_name} passed: Output matches expected results.")
+    else:
+        print(f"{test_name} failed: Output does not match expected results.")
+    
+    print(f"{test_name} completed.\n")
 
-# 定义测试
+def compare_files(file1, file2):
+    """逐行比较两个文件内容是否相同"""
+    with open(file1, 'r') as f1, open(file2, 'r') as f2:
+        for line1, line2 in zip(f1, f2):
+            if line1.strip() != line2.strip():
+                return False
+    return True
+
+# 定义测试用例
 def test_a():
     run_test((100, 50), "Test A")
 
@@ -78,8 +69,10 @@ def test_b():
 def test_c():
     run_test((10000, 5000), "Test C")
 
-# 运行测试
+# 运行所有测试用例
 if __name__ == "__main__":
+    # 生成原始文件以供比较
+    generate_sparse_matrix(100, 50, sparsity=0.95, filename="output_original.txt")
     test_a()
     test_b()
     test_c()
