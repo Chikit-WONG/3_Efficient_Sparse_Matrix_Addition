@@ -1,6 +1,6 @@
 import time
 import psutil
-from AddSparseMatrix import read_sparse_matrix, add_sparse_matrices, write_sparse_matrix
+from AddSparseMatrix import read_csr_matrix, add_csr_matrices, write_csr_matrix
 
 def monitor_memory_and_time(func, *args, **kwargs):
     """监控函数的内存和运行时间"""
@@ -18,19 +18,21 @@ def monitor_memory_and_time(func, *args, **kwargs):
 
 def matrix_addition_with_monitor(input1, input2, output2, rows, cols):
     """调用矩阵加法并监控运行性能"""
-    rows1, cols1, matrix1 = read_sparse_matrix(input1)
-    rows2, cols2, matrix2 = read_sparse_matrix(input2)
+    rows1, cols1, values1, columns1, row_pointers1 = read_csr_matrix(input1)
+    rows2, cols2, values2, columns2, row_pointers2 = read_csr_matrix(input2)
 
     if rows1 != rows2 or cols1 != cols2:
         raise ValueError("Matrices dimensions do not match.")
 
     # 监控矩阵加法性能
     result, elapsed_time, peak_memory = monitor_memory_and_time(
-        add_sparse_matrices, matrix1, matrix2, rows1, cols1  # 确保传入matrix1, matrix2, rows, cols
+        add_csr_matrices, rows1, cols1, values1, columns1, row_pointers1, values2, columns2, row_pointers2
     )
 
+    result_values, result_columns, result_row_pointers = result
+
     # 写入 output2.txt
-    write_sparse_matrix(output2, rows1, cols1, result)
+    write_csr_matrix(output2, rows1, cols1, result_values, result_columns, result_row_pointers)
 
     # 显示性能信息
     print(f"Matrix addition completed in {elapsed_time:.2f} seconds.")
@@ -41,6 +43,7 @@ def matrix_addition_with_monitor(input1, input2, output2, rows, cols):
         print("Warning: Elapsed time exceeded 30 seconds!")
     if peak_memory > 128:
         print("Warning: Peak memory usage exceeded 128 MB!")
+
 
 def main():
     input1 = "input1.txt"
