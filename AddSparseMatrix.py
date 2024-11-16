@@ -1,88 +1,93 @@
-def read_sparse_matrix(filepath):
-    """Read a sparse matrix from file in CSR-like format"""
-    with open(filepath, 'r') as f:
-        # Read dimensions
-        first_line = f.readline().strip()
-        rows, cols = map(int, first_line.split(','))
-        
-        # Initialize data structures
-        matrix = {}
-        
-        # Read matrix data
-        for line in f:
-            parts = line.strip().split()
-            if not parts:
-                continue
-                
-            row = int(parts[0])
-            if len(parts) > 1 and parts[1] != ':':
-                for elem in parts[1:]:
-                    if ':' in elem:
-                        col, val = map(int, elem.split(':'))
-                        matrix[(row-1, col-1)] = val  # Convert to 0-based indexing
-                        
-    return rows, cols, matrix
+def read_csr_matrix(file_path):
+    """读取稀疏矩阵并转换为 CSR 格式"""
+    with open(file_path, 'r') as file:
+        lines = file.readlines()
+        rows, cols = map(int, lines[0].strip().split(','))
 
-def write_sparse_matrix(filepath, rows, cols, matrix):
-    """Write sparse matrix to file in required format"""
-    with open(filepath, 'w') as f:
-        # Write dimensions
-        f.write(f"{rows}, {cols}\n")
-        
-        # Write matrix data
+        values = []
+        columns = []
+        row_pointers = [0]  # 起始为0
+
+        for line in lines[1:]:
+            row_data = line.strip().split()
+            nonzero_count = 0
+
+            if row_data and len(row_data) > 1:  # 确保行有数据
+                for element in row_data[1:]:
+                    if ":" in element:
+                        col_index, value = element.split(':')
+                        if col_index.strip() and value.strip():  # 确保不为空
+                            values.append(int(value))
+                            columns.append(int(col_index))
+                            nonzero_count += 1
+            row_pointers.append(row_pointers[-1] + nonzero_count)
+
+        return rows, cols, values, columns, row_pointers
+
+
+def write_csr_matrix(file_path, rows, cols, values, columns, row_pointers):
+    """将 CSR 格式矩阵写回文件，并确保列索引按顺序排列"""
+    with open(file_path, 'w') as file:
+        file.write(f"{rows}, {cols}\n")
         for i in range(rows):
-            row_data = []
-            # Collect all elements in current row
-            for j in range(cols):
-                if (i, j) in matrix:
-                    row_data.append((j+1, matrix[(i, j)]))  # Convert back to 1-based indexing
-            
-            # Format row
-            if row_data:
-                row_str = f"{i+1} " + " ".join(f"{col}:{val}" for col, val in sorted(row_data))
-                f.write(row_str + "\n")
+            start = row_pointers[i]
+            end = row_pointers[i + 1]
+
+            if start < end:
+                row_data = sorted(
+                    zip(columns[start:end], values[start:end]),  # 按列索引排序
+                    key=lambda x: x[0]  # 按列索引排序
+                )
+                row_data_str = " ".join(f"{col}:{val}" for col, val in row_data)
+                file.write(f"{i + 1} {row_data_str}\n")
             else:
-                f.write(f"{i+1} :\n")
+                file.write(f"{i + 1} :\n")
 
-def add_sparse_matrices(matrix1, matrix2, rows, cols):
-    """Add two sparse matrices represented as dictionaries"""
-    result = {}
 
-    # Add the upper half of the matrices first
-    half = rows // 2
-    for i in range(half):
-        for j in range(cols):
-            val1 = matrix1.get((i, j), 0)
-            val2 = matrix2.get((i, j), 0)
-            if val1 + val2 != 0:
-                result[(i, j)] = val1 + val2
-        write_sparse_matrix("output.txt", half, cols, result)  # Write upper part of matrix
+def add_csr_matrices(rows, cols, values1, columns1, row_pointers1, values2, columns2, row_pointers2):
+    """将两个 CSR 格式矩阵相加"""
+    result_values = []
+    result_columns = []
+    result_row_pointers = [0]
 
-    # Add the lower half of the matrices
-    for i in range(half, rows):
-        for j in range(cols):
-            val1 = matrix1.get((i, j), 0)
-            val2 = matrix2.get((i, j), 0)
-            if val1 + val2 != 0:
-                result[(i, j)] = val1 + val2
-        write_sparse_matrix("output.txt", i + 1, cols, result)  # Write lower part of matrix
+    for i in range(rows):
+        start1, end1 = row_pointers1[i], row_pointers1[i + 1]
+        start2, end2 = row_pointers2[i], row_pointers2[i + 1]
 
-    return result
+        row1 = {columns1[j]: values1[j] for j in range(start1, end1)}
+        row2 = {columns2[j]: values2[j] for j in range(start2, end2)}
+
+        merged_row = {}
+        for col in set(row1.keys()).union(row2.keys()):
+            merged_value = row1.get(col, 0) + row2.get(col, 0)
+            if merged_value != 0:
+                merged_row[col] = merged_value
+
+        result_values.extend(merged_row.values())
+        result_columns.extend(merged_row.keys())
+        result_row_pointers.append(len(result_values))
+
+    return result_values, result_columns, result_row_pointers
 
 def main():
-    # Read input matrices
-    rows1, cols1, matrix1 = read_sparse_matrix("input1.txt")
-    rows2, cols2, matrix2 = read_sparse_matrix("input2.txt")
-    
-    # Verify dimensions match
-    if (rows1, cols1) != (rows2, cols2):
-        raise ValueError("Matrix dimensions do not match")
-    
-    # Add matrices
-    result = add_sparse_matrices(matrix1, matrix2, rows1, cols1)
-    
-    # Write result
-    write_sparse_matrix("output.txt", rows1, cols1, result)
+    input1 = "input1.txt"
+    input2 = "input2.txt"
+    output = "output.txt"
+
+    # 读取 CSR 格式的矩阵
+    rows1, cols1, values1, columns1, row_pointers1 = read_csr_matrix(input1)
+    rows2, cols2, values2, columns2, row_pointers2 = read_csr_matrix(input2)
+
+    if rows1 != rows2 or cols1 != cols2:
+        raise ValueError("Matrices dimensions do not match.")
+
+    # 矩阵相加
+    result_values, result_columns, result_row_pointers = add_csr_matrices(
+        rows1, cols1, values1, columns1, row_pointers1, values2, columns2, row_pointers2
+    )
+
+    # 写回 CSR 格式的结果矩阵
+    write_csr_matrix(output, rows1, cols1, result_values, result_columns, result_row_pointers)
 
 if __name__ == "__main__":
     main()
