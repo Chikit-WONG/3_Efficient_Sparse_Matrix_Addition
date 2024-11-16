@@ -45,9 +45,9 @@ def test_matrix_addition(test_name, rows, cols, sparsity, input1, input2, output
 def main():
     # 定义测试
     tests = [
-        {"name": "Test A", "rows": 1000, "cols": 1000, "sparsity": 0.95, "score": 30},
-        {"name": "Test B", "rows": 2000, "cols": 2000, "sparsity": 0.95, "score": 30},
-        {"name": "Test C", "rows": 5000, "cols": 5000, "sparsity": 0.99, "score": 40},
+        {"name": "Test A", "rows": 100, "cols": 50, "sparsity": 0.95, "score": 30},
+        {"name": "Test B", "rows": 1000, "cols": 500, "sparsity": 0.95, "score": 30},
+        {"name": "Test C", "rows": 10000, "cols": 5000, "sparsity": 0.99, "score": 40},
     ]
 
     # 总分
