@@ -107,7 +107,7 @@ This ensures that the space complexity remains efficient, as only one row from e
 
 ---
 
-### **5. Conclusion**
+### **4. Conclusion**
 
 The **`AddSparseMatrix.py`** script efficiently performs sparse matrix addition using the **two-pointer technique** with a time complexity of **O(r * c + nnz1 + nnz2)** and a space complexity of **O(c + nnz_current)**. The code reads the input matrices row by row, processes the non-zero elements using the two-pointer technique, and writes the result directly to the output file, ensuring efficient memory usage.
 
